@@ -10,6 +10,9 @@
 #include <getopt.h>
 #include <libgen.h>
 #include "cuda.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #if NCCL_MAJOR >= 2
 ncclDataType_t test_types[ncclNumTypes] = {ncclInt8, ncclUint8, ncclInt32, ncclUint32, ncclInt64, ncclUint64, ncclHalf, ncclFloat, ncclDouble};
@@ -565,7 +568,35 @@ testResult_t AllocateBuffs(void **sendbuff, size_t sendBytes, void **recvbuff, s
 
 testResult_t run(); // Main function
 
+void overrideEnv()
+{
+  FILE* in = fopen("nccl_override.env", "rt");
+  if (in == NULL)
+    return;
+  char* line = NULL;
+#define MAXLEN 1024
+  char name[MAXLEN], value[MAXLEN];
+  size_t len;
+  ssize_t read;
+  while ((read = getline(&line, &len, in)) != -1) {
+    if (strlen(line) >= MAXLEN-1) {
+        printf("Variable in nccl_override.env is too long!");
+        return;
+    }
+    sscanf(line, "%[^=]=%s", &name, &value);
+    printf("OVERRIDING ENV %s=%s\n", name, value);
+    setenv(name, value, 1);
+  }
+
+  if (line)
+    free(line);
+  fclose(in);
+}
+
 int main(int argc, char* argv[]) {
+
+  overrideEnv();
+
   // Make sure everyline is flushed so that we see the progress of the test
   setlinebuf(stdout);
 
